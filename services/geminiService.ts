@@ -108,6 +108,7 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
     }
 
     const data = await response.json();
+    console.log("MuleRun Response:", data);
     
     // Report Cost if usage info is available
     if (data.usage) {
@@ -116,7 +117,12 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
       await reportCost(inputTokens, outputTokens, sessionId, agentId);
     }
 
-    return data.choices[0]?.message?.content?.trim() || "Memories...";
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+        console.warn("API returned empty content. Full response:", data);
+        return "Good vibes only"; // Changed fallback to distinguish
+    }
+    return content;
 
   } catch (error) {
     console.error("Error generating caption:", error);
