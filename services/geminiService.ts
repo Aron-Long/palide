@@ -79,7 +79,7 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
         "Authorization": `Bearer ${client.apiKey}`
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash-image", // Switching to the dedicated image model
+        model: "gemini-2.5-flash", // Reverting to the main flash model as requested/standard
         messages: [
           {
             role: "user",
@@ -91,13 +91,14 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
               {
                 type: "image_url",
                 image_url: {
-                  url: base64Image // Passed as full Data URL
+                  url: base64Image, // Passed as full Data URL
+                  detail: "auto"
                 }
               }
             ]
           }
         ],
-        max_tokens: 20
+        max_completion_tokens: 100 // Using correct param per doc and increasing limit
       })
     });
 
