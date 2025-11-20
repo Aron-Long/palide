@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { PolaroidPhoto } from '../types';
-import { Download, Loader2, X, ZoomIn } from 'lucide-react';
+import { Download, Loader2, X } from 'lucide-react';
 
 interface PolaroidProps {
   photo: PolaroidPhoto;
@@ -12,194 +12,104 @@ interface PolaroidProps {
 
 export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragEnd, onDelete }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [scale, setScale] = useState(1);
-  const [isActive, setIsActive] = useState(false);
-  const [isPinching, setIsPinching] = useState(false);
-  const startDistRef = useRef<number>(0);
-  const startScaleRef = useRef<number>(1);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!isActive) return;
-    e.stopPropagation();
-    // Prevent page scroll when zooming
-    // e.preventDefault() is not allowed in passive event, but we are in React handler
-    // React's synthetic event doesn't support preventDefault for wheel in some cases if passive
-    // But since we are stopping propagation, it might be fine.
-    
-    const delta = -e.deltaY * 0.002;
-    setScale(s => Math.min(Math.max(0.5, s + delta), 3));
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      setIsPinching(true);
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      startDistRef.current = dist;
-      startScaleRef.current = scale;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && isPinching) {
-      e.stopPropagation(); // Try to prevent drag interference
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      if (startDistRef.current > 0) {
-        const newScale = startScaleRef.current * (dist / startDistRef.current);
-        setScale(Math.min(Math.max(0.5, newScale), 3));
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    setIsPinching(false);
-  };
-
-  const toggleActive = () => {
-    setIsActive(!isActive);
-  };
 
   const downloadImage = async (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Configuration for high-res export
+    const scale = 3; 
+    const cardWidth = 240;
+    // Estimated height based on layout: 
+    // Top padding (12) + Image (270) + Bottom Area (roughly 58) = 340
+    const cardHeight = 340; 
     
-    try {
-      // Create a canvas to combine the polaroid frame and text
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    canvas.width = cardWidth * scale;
+    canvas.height = cardHeight * scale;
+    ctx.scale(scale, scale);
 
-      // Set canvas size (standard polaroid size roughly 3.5 x 4.2 inches)
-      // Using high resolution 
-      const width = 600;
-      const height = 720;
-      const padding = 30;
-      const bottomPadding = 120;
+    // 1. Draw White Card Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cardWidth, cardHeight);
 
-      canvas.width = width;
-      canvas.height = height;
+    // 2. Draw Image Area Background
+    const imgX = 12;
+    const imgY = 12;
+    const imgW = 216;
+    const imgH = 270;
 
-      // Draw white background (paper)
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#111827'; // gray-900
+    ctx.fillRect(imgX, imgY, imgW, imgH);
 
-      // Load the main image
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = photo.imageUrl;
-      });
+    // 3. Draw the Photo
+    const img = new Image();
+    img.src = photo.imageUrl;
+    
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
 
-      // Draw image centered with proper aspect ratio
-      const imgWidth = width - (padding * 2);
-      const imgRatio = img.width / img.height;
-      
-      // Calculate dimensions to fill the square area (cover)
-      // The target area is square: width - padding*2
-      const targetSize = width - (padding * 2);
-      
-      let drawWidth = targetSize;
-      let drawHeight = targetSize;
-      let offsetX = 0;
-      let offsetY = 0;
+    // Calculate aspect ratio for "cover" fit
+    const srcRatio = img.width / img.height;
+    const dstRatio = imgW / imgH;
+    let sX = 0, sY = 0, sW = img.width, sH = img.height;
 
-      if (imgRatio > 1) {
-        // Landscape image
-        drawHeight = targetSize;
-        drawWidth = targetSize * imgRatio;
-        offsetX = (targetSize - drawWidth) / 2;
-      } else {
-        // Portrait image
-        drawWidth = targetSize;
-        drawHeight = targetSize / imgRatio;
-        offsetY = (targetSize - drawHeight) / 2;
-      }
-
-      // Save context for clipping
-      ctx.save();
-      // Define the square clipping region
-      ctx.beginPath();
-      ctx.rect(padding, padding, targetSize, targetSize * 1.25); // 4:5 ratio like CSS
-      ctx.clip();
-      
-      // Draw image covering the area
-      // We need to draw the image so it covers the 4:5 area
-      const targetAreaWidth = targetSize;
-      const targetAreaHeight = targetSize * 1.25; // 4:5 aspect ratio
-      const targetRatio = targetAreaWidth / targetAreaHeight;
-
-      if (imgRatio > targetRatio) {
-         // Image is wider than target, fit height
-         drawHeight = targetAreaHeight;
-         drawWidth = targetAreaHeight * imgRatio;
-         offsetX = padding + (targetAreaWidth - drawWidth) / 2;
-         offsetY = padding;
-      } else {
-         // Image is taller than target, fit width
-         drawWidth = targetAreaWidth;
-         drawHeight = targetAreaWidth / imgRatio;
-         offsetX = padding;
-         offsetY = padding + (targetAreaHeight - drawHeight) / 2;
-      }
-
-      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-      ctx.restore();
-
-      // Draw overlay gradient (optional, for consistency with UI)
-      const gradient = ctx.createLinearGradient(padding, padding + targetAreaHeight, padding + targetAreaWidth, padding);
-      gradient.addColorStop(0, 'rgba(255,255,255,0.1)');
-      gradient.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(padding, padding, targetAreaWidth, targetAreaHeight);
-
-      // Draw Caption
-      if (photo.caption) {
-        ctx.fillStyle = '#374151'; // gray-700
-        // We need a font that looks handwritten. Since canvas can't guarantee 'Caveat' is loaded 
-        // same as CSS, we'll use a system fallback or try to use the loaded font
-        ctx.font = '40px "Caveat", cursive, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Save context to rotate text slightly
-        ctx.save();
-        ctx.translate(width / 2, height - (bottomPadding / 2));
-        ctx.rotate(-1 * Math.PI / 180); // -1 degree rotation
-        ctx.fillText(photo.caption, 0, 0);
-        ctx.restore();
-      }
-
-      // Draw Date
-      ctx.fillStyle = '#9ca3af'; // gray-400
-      ctx.font = '20px monospace';
-      ctx.textAlign = 'right';
-      ctx.fillText(new Date(photo.timestamp).toLocaleDateString(), width - padding, height - 15);
-
-      // Download
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `polaroid-${photo.timestamp}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-    } catch (err) {
-      console.error("Failed to generate polaroid image", err);
-      // Fallback to downloading just the raw image if composition fails
-      const link = document.createElement('a');
-      link.href = photo.imageUrl;
-      link.download = `raw-${photo.timestamp}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (srcRatio > dstRatio) {
+      sW = img.height * dstRatio;
+      sX = (img.width - sW) / 2;
+    } else {
+      sH = img.width / dstRatio;
+      sY = (img.height - sH) / 2;
     }
+
+    ctx.drawImage(img, sX, sY, sW, sH, imgX, imgY, imgW, imgH);
+
+    // 4. Draw Inner Shadow/Glossy Overlay (Optional, subtle)
+    const gradient = ctx.createLinearGradient(imgX, imgY, imgX + imgW, imgY + imgH);
+    gradient.addColorStop(0, 'rgba(255,255,255,0.1)');
+    gradient.addColorStop(0.5, 'transparent');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.1)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(imgX, imgY, imgW, imgH);
+
+    // 5. Draw Caption
+    if (photo.caption) {
+      // Wait for fonts to be ready ensures Caveat is available
+      await document.fonts.ready;
+      
+      ctx.save();
+      // Position: Below image, centered. 
+      // Image ends at 12+270=282. Add some margin.
+      const captionCenterY = 282 + 24; 
+      ctx.translate(cardWidth / 2, captionCenterY);
+      ctx.rotate(-1 * Math.PI / 180); // -1 deg rotation like CSS
+      
+      ctx.font = '24px "Caveat", cursive';
+      ctx.fillStyle = '#374151'; // text-gray-700
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(photo.caption, 0, 0);
+      ctx.restore();
+    }
+
+    // 6. Draw Date
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#9ca3af'; // text-gray-400
+    ctx.textAlign = 'right';
+    // Bottom right position
+    ctx.fillText(new Date(photo.timestamp).toLocaleDateString(), cardWidth - 12, cardHeight - 10);
+
+    // 7. Trigger Download
+    const link = document.createElement('a');
+    link.download = `polaroid-${photo.timestamp}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.9);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -209,7 +119,7 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
 
   return (
     <motion.div
-      drag={!isPinching}
+      drag
       dragConstraints={containerRef}
       dragMomentum={false}
       initial={{ 
@@ -222,10 +132,9 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
       animate={{ 
         x: photo.x, 
         y: photo.y, 
-        scale: scale, 
+        scale: 1, 
         opacity: 1,
-        rotate: photo.rotation,
-        zIndex: isActive ? 50 : 20
+        rotate: photo.rotation 
       }}
       exit={{ 
         scale: 0.8, 
@@ -240,24 +149,10 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
       }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      onWheel={handleWheel}
-      onClick={toggleActive}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className={`absolute cursor-move touch-none select-none pointer-events-auto ${isActive ? 'ring-2 ring-blue-400 ring-offset-4 rounded-sm' : ''}`}
+      className="absolute cursor-move touch-none select-none z-20 pointer-events-auto"
       style={{ width: '240px' }}
     >
-      {/* Zoom UI Hint */}
-      {(isActive || isHovered) && (
-        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1 pointer-events-none z-50 whitespace-nowrap backdrop-blur-sm">
-            <ZoomIn size={10} />
-            <span className="hidden sm:inline">Scroll / Pinch to Zoom</span>
-            <span className="sm:hidden">Pinch to Zoom</span>
-        </div>
-      )}
-      
-      <div className="bg-white p-3 pb-8 shadow-xl transition-shadow duration-300 hover:shadow-2xl relative">
+      <div className="bg-white p-3 pb-8 shadow-xl transition-transform duration-300 hover:scale-105 hover:shadow-2xl relative">
         {/* Photo Area */}
         <div className="bg-gray-900 aspect-[4/5] w-full overflow-hidden relative mb-3">
           <img
