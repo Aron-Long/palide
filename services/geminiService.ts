@@ -79,7 +79,7 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
         "Authorization": `Bearer ${client.apiKey}`
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-image", // Switching to the dedicated image model
         messages: [
           {
             role: "user",
