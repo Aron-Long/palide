@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera } from './components/Camera';
 import { Polaroid } from './components/Polaroid';
 import { PolaroidPhoto } from './types';
@@ -10,6 +10,18 @@ const App: React.FC = () => {
   const [photos, setPhotos] = useState<PolaroidPhoto[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Check for MuleRun iframe parameters to log context
+    const params = new URLSearchParams(window.location.search);
+    const origin = params.get('origin');
+    if (origin?.includes('mulerun')) {
+      console.log('MuleRun Environment Detected', {
+        userId: params.get('userId'),
+        agentId: params.get('agentId')
+      });
+    }
+  }, []);
 
   const handleCapture = async (dataUrl: string) => {
     if (isProcessing) return;
