@@ -15,7 +15,8 @@ const getMuleRunClient = () => {
 
 // Helper to report cost to our Vercel backend (which proxies to MuleRun)
 const reportCost = async (
-  totalTokens: number, 
+  inputTokens: number,
+  outputTokens: number,
   sessionId: string | null, 
   agentId: string | null
 ) => {
@@ -24,10 +25,21 @@ const reportCost = async (
     return;
   }
   
-  // Cost to Report = (Total Tokens * PRICE_PER_TOKEN) / 0.6
-  const PRICE_PER_TOKEN = 1; // 1 unit (0.0001 credits) per token (example)
-  const rawCost = totalTokens * PRICE_PER_TOKEN;
-  const chargeableCost = Math.ceil(rawCost / 0.6); 
+  // Pricing logic for Gemini 2.5 Flash (per 1 Million Tokens):
+  // Input: 32.5 Cents -> 0.0000325 Cents/token
+  // Output: 262.5 Cents -> 0.0002625 Cents/token
+  // MuleRun Unit: 0.0001 Credit (Cent) = 1 Unit
+  // So:
+  // Input Unit Price: 0.0000325 * 10000 = 0.325 Units/token
+  // Output Unit Price: 0.0002625 * 10000 = 2.625 Units/token
+
+  const INPUT_PRICE_PER_TOKEN = 0.325;
+  const OUTPUT_PRICE_PER_TOKEN = 2.625;
+
+  const rawCostUnits = (inputTokens * INPUT_PRICE_PER_TOKEN) + (outputTokens * OUTPUT_PRICE_PER_TOKEN);
+  
+  // Apply markup: (Cost / 0.6)
+  const chargeableCost = Math.ceil(rawCostUnits / 0.6);
 
   try {
     await fetch('/api/metering', {
@@ -42,7 +54,7 @@ const reportCost = async (
         isFinal: false 
       })
     });
-    console.log(`Reported metering cost: ${chargeableCost} units for ${totalTokens} tokens.`);
+    console.log(`Reported metering cost: ${chargeableCost} units (Raw: ${rawCostUnits.toFixed(4)}) for ${inputTokens} in / ${outputTokens} out.`);
   } catch (e) {
     console.error("Failed to report metering", e);
   }
@@ -98,10 +110,10 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
     const data = await response.json();
     
     // Report Cost if usage info is available
-    // Note: Some providers/proxies might not return usage in standard format, 
-    // but standard OpenAI format usually includes it.
-    if (data.usage && data.usage.total_tokens) {
-      await reportCost(data.usage.total_tokens, sessionId, agentId);
+    if (data.usage) {
+      const inputTokens = data.usage.prompt_tokens || 0;
+      const outputTokens = data.usage.completion_tokens || 0;
+      await reportCost(inputTokens, outputTokens, sessionId, agentId);
     }
 
     return data.choices[0]?.message?.content?.trim() || "Memories...";
