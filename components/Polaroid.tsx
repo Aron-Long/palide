@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { PolaroidPhoto } from '../types';
-import { Download, Loader2, X } from 'lucide-react';
+import { Download, Loader2, X, ZoomIn, MousePointerClick } from 'lucide-react';
 
 interface PolaroidProps {
   photo: PolaroidPhoto;
@@ -12,6 +12,52 @@ interface PolaroidProps {
 
 export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragEnd, onDelete }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [isActive, setIsActive] = useState(false);
+  const [isPinching, setIsPinching] = useState(false);
+  const startDistRef = useRef<number>(0);
+  const startScaleRef = useRef<number>(1);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!isActive) return;
+    // Adjust sensitivity based on input device type logic roughly inferred
+    // Standard mouse wheel delta is often around 100, trackpads can be smaller.
+    const ZOOM_SENSITIVITY = 0.002; 
+    const newScale = scale - e.deltaY * ZOOM_SENSITIVITY;
+    const clampedScale = Math.min(Math.max(0.5, newScale), 3);
+    
+    console.log('Zooming:', { deltaY: e.deltaY, oldScale: scale, newScale: clampedScale });
+    setScale(clampedScale);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.stopPropagation();
+      setIsPinching(true);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      startDistRef.current = dist;
+      startScaleRef.current = scale;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isPinching && e.touches.length === 2) {
+      e.stopPropagation();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const newScale = startScaleRef.current * (dist / startDistRef.current);
+      setScale(Math.min(Math.max(0.5, newScale), 3));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsPinching(false);
+  };
 
   const downloadImage = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -119,7 +165,7 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
 
   return (
     <motion.div
-      drag
+      drag={!isPinching}
       dragConstraints={containerRef}
       dragMomentum={false}
       initial={{ 
@@ -132,9 +178,10 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
       animate={{ 
         x: photo.x, 
         y: photo.y, 
-        scale: 1, 
+        scale: scale, 
         opacity: 1,
-        rotate: photo.rotation 
+        rotate: photo.rotation,
+        zIndex: isActive ? 50 : 20
       }}
       exit={{ 
         scale: 0.8, 
@@ -149,7 +196,15 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
       }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="absolute cursor-move touch-none select-none z-20 pointer-events-auto"
+      onTap={() => {
+        console.log('Tap detected, toggling active state');
+        setIsActive(!isActive);
+      }}
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className={`absolute cursor-move touch-none select-none pointer-events-auto transition-shadow ${isActive ? 'ring-2 ring-blue-400 ring-offset-4 rounded-lg' : ''}`}
       style={{ width: '240px' }}
     >
       <div className="bg-white p-3 pb-8 shadow-xl transition-transform duration-300 hover:scale-105 hover:shadow-2xl relative">
@@ -183,8 +238,14 @@ export const Polaroid: React.FC<PolaroidProps> = ({ photo, containerRef, onDragE
         </div>
 
         {/* Hover Controls */}
-        {isHovered && (
+        {(isHovered || isActive) && (
           <>
+             {/* Zoom Hint */}
+             <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-2 py-1 rounded-full whitespace-nowrap pointer-events-none flex items-center gap-1 opacity-0 animate-in fade-in slide-in-from-top-2 duration-300 fill-mode-forwards" style={{ opacity: 1 }}>
+              <ZoomIn size={10} />
+              <span>{isActive ? 'Scroll / Pinch' : 'Click to Zoom'}</span>
+            </div>
+
             {/* Delete Button (Top Left) */}
             <button
               onClick={handleDelete}
