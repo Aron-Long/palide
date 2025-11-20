@@ -1,20 +1,32 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Retro AI Polaroid
 
-# Run and deploy your AI Studio app
+A retro-style Polaroid camera application powered by Gemini AI.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/13PfWTM_t79Z67QC14MnTX994dyMFnrbz
+- **Realistic Polaroid Camera**: Takes photos using your webcam with a retro interface.
+- **AI Captioning**: Uses Gemini AI to generate context-aware captions for your photos.
+- **Developing Effect**: Photos slowly develop and animate out of the camera.
+- **Interactive Photo Wall**: Drag, drop, and arrange your photos on a digital wall.
+- **Zoom & Pan**: 
+    - **Desktop**: Click a photo to select, then use the mouse wheel to zoom.
+    - **Mobile**: Pinch to zoom photos and the camera interface.
+- **Download**: Save your Polaroid memories as images.
 
-## Run Locally
+## Technologies
 
-**Prerequisites:**  Node.js
+- React 19
+- Vite
+- Framer Motion
+- Google Gemini AI SDK
+- Tailwind CSS
 
+## Setup
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Clone the repository
+2. `npm install`
+3. Create a `.env` file with your Gemini API key:
+   ```
+   VITE_GEMINI_API_KEY=your_api_key_here
+   ```
+4. `npm run dev`
