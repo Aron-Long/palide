@@ -86,7 +86,7 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
             content: [
               {
                 type: "text",
-                text: "Write a very short, nostalgic, or witty handwritten-style caption (max 4-5 words) for this photo. Do not use quotes. If a person is in it, be complimentary. If it's an object, describe the vibe."
+                text: `Write a unique, very short, nostalgic, or witty handwritten-style caption (max 3-5 words) for this photo. Do not use quotes. Vary the tone (funny, sentimental, mysterious). Avoid generic phrases like "Memories" or "Good times". Random seed: ${Math.random()}`
               },
               {
                 type: "image_url",
