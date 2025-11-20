@@ -109,7 +109,6 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
     }
 
     const data = await response.json();
-    console.log("MuleRun Response:", JSON.stringify(data, null, 2)); // Full debug log
     
     // Report Cost if usage info is available
     if (data.usage) {
