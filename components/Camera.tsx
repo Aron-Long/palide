@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera as CameraIcon, RefreshCw, ZoomIn } from 'lucide-react';
+import { Camera as CameraIcon, RefreshCw, ZoomIn, Upload } from 'lucide-react';
 
 interface CameraProps {
   onCapture: (dataUrl: string) => void;
@@ -9,6 +9,7 @@ interface CameraProps {
 export const Camera: React.FC<CameraProps> = ({ onCapture, isProcessing }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string>('');
   const [flash, setFlash] = useState(false);
@@ -51,8 +52,35 @@ export const Camera: React.FC<CameraProps> = ({ onCapture, isProcessing }) => {
       setError('');
     } catch (err) {
       console.error("Error accessing camera:", err);
-      setError('Could not access camera. Please allow permissions.');
+      const isIframe = window.self !== window.top;
+      const errorName = (err as any)?.name;
+      
+      if (isIframe && (errorName === 'NotAllowedError' || errorName === 'SecurityError')) {
+         setError('Camera blocked by host. Use Upload.');
+      } else {
+         setError('Could not access camera.');
+      }
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+            // Verify it's an image
+            const img = new Image();
+            img.onload = () => {
+                onCapture(reader.result as string);
+            };
+            img.src = reader.result;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset value
+    if (e.target) e.target.value = '';
   };
 
   const takePicture = () => {
@@ -177,8 +205,16 @@ export const Camera: React.FC<CameraProps> = ({ onCapture, isProcessing }) => {
                         
                         {/* The actual Webcam Video */}
                         {error ? (
-                            <div className="w-full h-full flex items-center justify-center text-white text-xs text-center p-2">
-                                {error} <button onClick={startCamera} className="ml-1"><RefreshCw size={12}/></button>
+                            <div className="w-full h-full flex flex-col items-center justify-center text-white text-xs text-center p-4 bg-gray-900/90 z-50 absolute inset-0">
+                                <p className="mb-3 text-red-300 font-semibold leading-tight">{error}</p>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    <button onClick={() => startCamera()} className="px-3 py-1.5 bg-gray-700 rounded hover:bg-gray-600 flex items-center gap-1.5 transition-colors">
+                                        <RefreshCw size={12}/> Retry
+                                    </button>
+                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-blue-600 rounded hover:bg-blue-500 flex items-center gap-1.5 transition-colors shadow-lg">
+                                        <Upload size={12}/> Upload
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                              <video 
@@ -227,6 +263,15 @@ export const Camera: React.FC<CameraProps> = ({ onCapture, isProcessing }) => {
       {flash && (
         <div className="fixed inset-0 bg-white z-50 animate-out fade-out duration-300 pointer-events-none"></div>
       )}
+
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        accept="image/*" 
+        capture="environment"
+        className="hidden" 
+        onChange={handleFileUpload}
+      />
 
       <canvas ref={canvasRef} className="hidden" />
     </div>

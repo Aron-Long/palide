@@ -26,12 +26,24 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(THEMES[0]);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  // Access Control State
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check for MuleRun iframe parameters to log context
+    // Check for MuleRun iframe parameters or local dev environment
     const params = new URLSearchParams(window.location.search);
     const origin = params.get('origin');
+    const inIframe = window.self !== window.top;
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    // Authorize if:
+    // 1. It's in an iframe (MuleRun context)
+    // 2. It's localhost (Dev context)
+    if (inIframe || isDev) {
+        setIsAuthorized(true);
+    }
+
     if (origin?.includes('mulerun')) {
       console.log('MuleRun Environment Detected', {
         userId: params.get('userId'),
@@ -99,6 +111,21 @@ const App: React.FC = () => {
   const handleDeletePhoto = (id: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
+
+  if (!isAuthorized) {
+    return (
+      <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-[#f2ece1] text-gray-800 font-mono p-8 text-center">
+        <div className="bg-white p-8 rounded-lg shadow-xl border-4 border-gray-200 max-w-md transform rotate-1">
+          <h1 className="text-2xl font-bold mb-4 tracking-widest">RESTRICTED AREA</h1>
+          <div className="w-full h-0.5 bg-gray-300 mb-6"></div>
+          <p className="mb-6 text-sm leading-relaxed">
+            This retro polaroid experience is exclusively available within the MuleRun platform.
+          </p>
+          <div className="text-xs text-gray-400 uppercase tracking-widest">Access Denied</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
