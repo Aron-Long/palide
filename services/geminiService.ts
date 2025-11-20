@@ -26,7 +26,7 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
         "Authorization": `Bearer ${client.apiKey}`
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash-image", // Using the supported MuleRun model from docs
+        model: "gemini-2.5-flash",
         messages: [
           {
             role: "user",
@@ -38,7 +38,7 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
               {
                 type: "image_url",
                 image_url: {
-                  url: base64Image
+                  url: base64Image // Passed as full Data URL
                 }
               }
             ]
@@ -49,7 +49,9 @@ export const generatePhotoCaption = async (base64Image: string): Promise<string>
     });
 
     if (!response.ok) {
-        throw new Error(`API call failed: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error("MuleRun API Error Details:", errorText);
+        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
